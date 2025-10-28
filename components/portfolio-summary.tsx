@@ -11,7 +11,8 @@ interface PortfolioSummaryProps {
 
 export function PortfolioSummary({ data }: PortfolioSummaryProps) {
   const totalValue = data?.totalValue || 0
-  const change24h = data?.change24h || 0
+  // Fix: Use totalChange24h from PortfolioData type, with fallback to change24h for compatibility
+  const change24h = (data as any)?.change24h ?? data?.totalChange24h ?? 0
   const assetCount = data?.balances?.length || 0
   const nonZeroAssets = data?.balances?.filter(b => b.valueUSDT > 0).length || 0
 
