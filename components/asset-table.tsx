@@ -4,14 +4,14 @@ import { useState } from "react"
 import { ChevronUp, ChevronDown, Search } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import type { AssetBalance } from "@/lib/types"
-import { formatCurrency, formatPercentage } from "@/lib/utils"
+import type { BalanceData } from "@/lib/types"
+import { formatCurrency } from "@/lib/utils"
 
 interface AssetTableProps {
-  balances: AssetBalance[]
+  balances: BalanceData[]
 }
 
-type SortKey = 'asset' | 'balance' | 'valueUSDT' | 'priceUSDT'
+type SortKey = keyof Pick<BalanceData, 'asset' | 'total' | 'valueUSDT' | 'priceUSDT'>
 type SortDirection = 'asc' | 'desc'
 
 export function AssetTable({ balances }: AssetTableProps) {
@@ -34,12 +34,12 @@ export function AssetTable({ balances }: AssetTableProps) {
       balance.valueUSDT > 0
     )
     .sort((a, b) => {
-      let aValue: any = a[sortKey]
-      let bValue: any = b[sortKey]
+      let aValue: number | string = a[sortKey] as any
+      let bValue: number | string = b[sortKey] as any
       
       if (typeof aValue === 'string') {
         aValue = aValue.toLowerCase()
-        bValue = bValue.toLowerCase()
+        bValue = (bValue as string).toLowerCase()
       }
       
       if (sortDirection === 'asc') {
@@ -91,11 +91,11 @@ export function AssetTable({ balances }: AssetTableProps) {
                 <th className="text-right p-4">
                   <Button
                     variant="ghost"
-                    onClick={() => handleSort('balance')}
+                    onClick={() => handleSort('total')}
                     className="h-auto p-0 font-semibold hover:bg-transparent"
                   >
                     Balance
-                    <SortIcon column="balance" />
+                    <SortIcon column="total" />
                   </Button>
                 </th>
                 <th className="text-right p-4">
