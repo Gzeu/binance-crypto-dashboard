@@ -11,17 +11,18 @@ import type { PortfolioData } from '@/lib/types'
 import { exportToCSV } from '@/lib/utils'
 
 // Dynamic imports for components that cause hydration issues
-const AssetTable = dynamic(() => import('@/components/asset-table'), { 
+// Fix: Use proper import syntax for named exports
+const AssetTable = dynamic(() => import('@/components/asset-table').then(mod => ({ default: mod.AssetTable })), { 
   ssr: false,
   loading: () => <div className="animate-pulse bg-muted h-32 rounded-lg" />
 })
 
-const AllocationChart = dynamic(() => import('@/components/allocation-chart'), { 
+const AllocationChart = dynamic(() => import('@/components/allocation-chart').then(mod => ({ default: mod.AllocationChart })), { 
   ssr: false,
   loading: () => <div className="animate-pulse bg-muted h-64 rounded-lg" />
 })
 
-const LastUpdated = dynamic(() => import('@/components/last-updated'), { 
+const LastUpdated = dynamic(() => import('@/components/last-updated').then(mod => ({ default: mod.LastUpdated })), { 
   ssr: false,
   loading: () => <span className="text-sm text-muted-foreground">Loading...</span>
 })
