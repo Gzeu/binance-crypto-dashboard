@@ -1,29 +1,42 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense } from 'react'
 import useSWR from 'swr'
+import dynamic from 'next/dynamic'
 import { Loader2, RefreshCw, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PortfolioSummary } from '@/components/portfolio-summary'
-import { AssetTable } from '@/components/asset-table'
-import { AllocationChart } from '@/components/allocation-chart'
-import type { PortfolioData, AssetBalance } from '@/lib/types'
+import type { PortfolioData } from '@/lib/types'
 import { exportToCSV } from '@/lib/utils'
+
+// Dynamic imports for components that cause hydration issues
+const AssetTable = dynamic(() => import('@/components/asset-table'), { 
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-muted h-32 rounded-lg" />
+})
+
+const AllocationChart = dynamic(() => import('@/components/allocation-chart'), { 
+  ssr: false,
+  loading: () => <div className="animate-pulse bg-muted h-64 rounded-lg" />
+})
+
+const LastUpdated = dynamic(() => import('@/components/last-updated'), { 
+  ssr: false,
+  loading: () => <span className="text-sm text-muted-foreground">Loading...</span>
+})
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function Dashboard() {
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
-  
   const { data, error, isLoading, mutate } = useSWR<PortfolioData>(
     '/api/binance-balance',
     fetcher,
     {
-      refreshInterval: 30000, // Refresh every 30 seconds
+      refreshInterval: 30000,
       revalidateOnFocus: true,
       errorRetryCount: 3,
-      onSuccess: () => setLastUpdated(new Date())
+      errorRetryInterval: 5000,
     }
   )
 
@@ -42,7 +55,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-destructive">Error Loading Portfolio</CardTitle>
+            <CardTitle className="text-destructive">API Error</CardTitle>
             <CardDescription>
               {error.message || 'Failed to load portfolio data. Please check your API configuration.'}
             </CardDescription>
@@ -59,14 +72,14 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Portfolio Dashboard</h1>
-          <p className="text-muted-foreground">
-            Last updated: {lastUpdated.toLocaleTimeString()}
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight">Binance Portfolio</h1>
+          <Suspense fallback={<span className="text-sm text-muted-foreground">Loading...</span>}>
+            <LastUpdated data={data} />
+          </Suspense>
         </div>
         
         <div className="flex gap-2">
@@ -80,7 +93,7 @@ export default function Dashboard() {
             ) : (
               <RefreshCw className="w-4 h-4 mr-2" />
             )}
-            Refresh
+            {isLoading ? 'Refreshing...' : 'Refresh'}
           </Button>
           
           <Button
@@ -94,26 +107,32 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto" />
-            <p className="text-muted-foreground">Loading portfolio data...</p>
-          </div>
+      {/* Loading State */}
+      {isLoading && !data && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="animate-pulse bg-muted h-64 rounded-lg" />
+          <div className="animate-pulse bg-muted h-64 rounded-lg" />
         </div>
-      ) : (
+      )}
+
+      {/* Content */}
+      {data && (
         <>
           {/* Portfolio Summary */}
           <PortfolioSummary data={data} />
 
-          {/* Charts and Table */}
+          {/* Charts and Table with Suspense boundaries */}
           <div className="grid gap-8 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <AssetTable balances={data?.balances || []} />
+              <Suspense fallback={<div className="animate-pulse bg-muted h-32 rounded-lg" />}>
+                <AssetTable balances={data.balances || []} />
+              </Suspense>
             </div>
             
             <div className="lg:col-span-1">
-              <AllocationChart balances={data?.balances || []} />
+              <Suspense fallback={<div className="animate-pulse bg-muted h-64 rounded-lg" />}>
+                <AllocationChart balances={data.balances || []} />
+              </Suspense>
             </div>
           </div>
         </>
