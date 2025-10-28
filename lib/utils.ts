@@ -1,201 +1,158 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+import type { AssetBalance } from './types'
 
+/**
+ * Merge Tailwind classes with proper precedence
+ */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(
-  value: number,
-  currency: string = 'USD',
-  minimumFractionDigits: number = 2,
-  maximumFractionDigits: number = 8
-): string {
+/**
+ * Format currency values with proper decimal places
+ */
+export function formatCurrency(value: number): string {
+  if (value === 0) return '$0.00'
+  if (value < 0.01) return `$${value.toFixed(8)}`
+  if (value < 1) return `$${value.toFixed(4)}`
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency,
-    minimumFractionDigits,
-    maximumFractionDigits,
-  }).format(value);
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
 }
 
-export function formatPercentage(
-  value: number,
-  minimumFractionDigits: number = 2,
-  maximumFractionDigits: number = 2
-): string {
-  return new Intl.NumberFormat('en-US', {
+/**
+ * Format percentage values with proper sign and decimal places
+ */
+export function formatPercentage(value: number): string {
+  const formatted = new Intl.NumberFormat('en-US', {
     style: 'percent',
-    minimumFractionDigits,
-    maximumFractionDigits,
-  }).format(value / 100);
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+    signDisplay: 'exceptZero'
+  }).format(value / 100)
+  
+  return formatted
 }
 
-export function formatNumber(
-  value: number,
-  minimumFractionDigits: number = 0,
-  maximumFractionDigits: number = 8
-): string {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits,
-    maximumFractionDigits,
-  }).format(value);
+/**
+ * Format large numbers with appropriate suffixes (K, M, B)
+ */
+export function formatNumber(value: number): string {
+  if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`
+  if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`
+  if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`
+  return value.toFixed(2)
 }
 
-export function formatTimestamp(timestamp: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(timestamp));
+/**
+ * Export portfolio data to CSV format
+ */
+export function exportToCSV(balances: AssetBalance[], filename: string = 'portfolio.csv'): void {
+  const headers = ['Asset', 'Balance', 'Price (USDT)', 'Value (USDT)', 'Allocation (%)']
+  
+  const totalValue = balances.reduce((sum, balance) => sum + balance.valueUSDT, 0)
+  
+  const rows = balances
+    .filter(balance => balance.valueUSDT > 0)
+    .sort((a, b) => b.valueUSDT - a.valueUSDT)
+    .map(balance => [
+      balance.asset,
+      balance.total.toFixed(8),
+      balance.priceUSDT.toFixed(2),
+      balance.valueUSDT.toFixed(2),
+      ((balance.valueUSDT / totalValue) * 100).toFixed(2)
+    ])
+  
+  // Add summary row
+  rows.push(['', '', 'TOTAL:', totalValue.toFixed(2), '100.00'])
+  
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.join(','))
+  ].join('\n')
+  
+  // Create and download CSV file
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 }
 
-export function calculateChange(current: number, previous: number): number {
-  if (previous === 0) return 0;
-  return ((current - previous) / previous) * 100;
-}
-
+/**
+ * Debounce function for search inputs
+ */
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
-
-export function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  limit: number
-): (...args: Parameters<T>) => void {
-  let inThrottle: boolean;
-  return (...args: Parameters<T>) => {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  };
-}
-
-export function exportToCSV(data: any[], filename: string): void {
-  if (!data || data.length === 0) return;
-
-  const headers = Object.keys(data[0]);
-  const csvContent = [
-    headers.join(','),
-    ...data.map(row => 
-      headers.map(header => {
-        const value = row[header];
-        if (typeof value === 'string' && (value.includes(',') || value.includes('"'))) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      }).join(',')
-    )
-  ].join('\n');
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
+  let timeout: NodeJS.Timeout
   
-  if (link.download !== undefined) {
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `${filename}-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
   }
 }
 
-export function getAssetLogo(symbol: string): string {
-  const logoMap: Record<string, string> = {
-    BTC: '₿',
-    ETH: 'Ξ',
-    BNB: 'BNB',
-    ADA: 'ADA',
-    DOT: 'DOT',
-    LINK: 'LINK',
-    LTC: 'Ł',
-    XRP: 'XRP',
-    BCH: 'BCH',
-    EOS: 'EOS',
-    TRX: 'TRX',
-    XTZ: 'XTZ',
-    ATOM: 'ATOM',
-    NEO: 'NEO',
-    IOTA: 'IOTA',
-    DASH: 'DASH',
-    ZEC: 'ZEC',
-    XMR: 'XMR',
-  };
+/**
+ * Get asset logo URL (placeholder for now, can be extended with real API)
+ */
+export function getAssetLogoUrl(asset: string): string {
+  // This could be extended to use a real crypto logo API
+  return `https://cryptoicons.org/api/icon/${asset.toLowerCase()}/200`
+}
+
+/**
+ * Calculate portfolio allocation percentages
+ */
+export function calculateAllocations(balances: AssetBalance[]): Array<AssetBalance & { percentage: number }> {
+  const totalValue = balances.reduce((sum, balance) => sum + balance.valueUSDT, 0)
   
-  return logoMap[symbol] || symbol;
+  return balances
+    .filter(balance => balance.valueUSDT > 0)
+    .map(balance => ({
+      ...balance,
+      percentage: totalValue > 0 ? (balance.valueUSDT / totalValue) * 100 : 0
+    }))
+    .sort((a, b) => b.valueUSDT - a.valueUSDT)
 }
 
-export function getAssetName(symbol: string): string {
-  const nameMap: Record<string, string> = {
-    BTC: 'Bitcoin',
-    ETH: 'Ethereum',
-    BNB: 'Binance Coin',
-    ADA: 'Cardano',
-    DOT: 'Polkadot',
-    LINK: 'Chainlink',
-    LTC: 'Litecoin',
-    XRP: 'Ripple',
-    BCH: 'Bitcoin Cash',
-    EOS: 'EOS',
-    TRX: 'TRON',
-    XTZ: 'Tezos',
-    ATOM: 'Cosmos',
-    NEO: 'Neo',
-    IOTA: 'IOTA',
-    DASH: 'Dash',
-    ZEC: 'Zcash',
-    XMR: 'Monero',
-  };
-  
-  return nameMap[symbol] || symbol;
-}
-
-export function validateApiCredentials(): boolean {
-  return !!(
-    process.env.BINANCE_API_KEY && 
-    process.env.BINANCE_API_SECRET
-  );
-}
-
-export function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-export function retry<T>(
+/**
+ * Retry function with exponential backoff
+ */
+export async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  retries: number = 3,
-  delay: number = 1000
+  maxRetries: number = 3,
+  baseDelay: number = 1000
 ): Promise<T> {
-  return fn().catch(error => {
-    if (retries > 0) {
-      return sleep(delay).then(() => retry(fn, retries - 1, delay * 2));
-    }
-    throw error;
-  });
-}
-
-export function isValidEnvironment(): boolean {
-  const requiredEnvVars = [
-    'BINANCE_API_KEY',
-    'BINANCE_API_SECRET',
-  ];
+  let lastError: Error
   
-  return requiredEnvVars.every(envVar => 
-    process.env[envVar] && process.env[envVar]!.length > 0
-  );
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn()
+    } catch (error) {
+      lastError = error as Error
+      
+      if (i === maxRetries) {
+        throw lastError
+      }
+      
+      // Exponential backoff: 1s, 2s, 4s, 8s...
+      const delay = baseDelay * Math.pow(2, i)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  
+  throw lastError!
 }
