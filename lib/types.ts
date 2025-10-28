@@ -11,6 +11,9 @@ export interface BalanceData {
   allocation?: number;
 }
 
+// Backward-compatible alias used by UI components
+export type AssetBalance = BalanceData;
+
 export interface PortfolioData {
   balances: BalanceData[];
   totalValue: number;
