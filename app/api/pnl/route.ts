@@ -121,7 +121,6 @@ export async function GET(req: NextRequest) {
     const client = Binance({
       apiKey: process.env.BINANCE_API_KEY!,
       apiSecret: process.env.BINANCE_API_SECRET!,
-      useServerTime: true,
     })
 
     const { searchParams } = new URL(req.url)
