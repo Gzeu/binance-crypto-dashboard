@@ -39,10 +39,10 @@ async function createBinanceClient() {
     throw new Error(validation.error);
   }
 
+  // Note: useServerTime is not a valid option in current binance-api-node types
   return Binance({
     apiKey: process.env.BINANCE_API_KEY!,
     apiSecret: process.env.BINANCE_API_SECRET!,
-    useServerTime: true,
   });
 }
 
