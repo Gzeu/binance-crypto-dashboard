@@ -1,275 +1,367 @@
-# 🚀 Binance Crypto Dashboard
+# 🚀 Binance Crypto Dashboard MVP
 
-**Production-ready Binance cryptocurrency portfolio dashboard built with Next.js 14, TypeScript, and Vercel deployment**
+[![Vercel](https://img.shields.io/badge/vercel-deployed-brightgreen.svg)](https://binance-crypto-dashboard-flax.vercel.app)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC.svg)](https://tailwindcss.com/)
 
-![Dashboard Preview](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
-![Next.js](https://img.shields.io/badge/Next.js-14.0-black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
-![Vercel](https://img.shields.io/badge/Deploy-Vercel-black)
+O aplicație completă de dashboard crypto pentru Binance, construită cu Next.js 14 (App Router) și optimizată pentru deployment pe Vercel. Oferă vizualizare în timp real a portofoliului crypto cu interfață profesională și funcționalități avansate.
 
-## ✨ Features
+🌐 **Live Demo**: [https://binance-crypto-dashboard-flax.vercel.app](https://binance-crypto-dashboard-flax.vercel.app)
 
-### 📊 **Portfolio Management**
-- **Real-time Portfolio Overview** - Total value, 24h changes, asset allocation
-- **Interactive Asset Table** - Sortable columns with search and filter functionality
-- **Visual Allocation Charts** - Pie charts and distribution analysis
-- **CSV Export** - Download portfolio data for external analysis
+## ✨ Caracteristici Principale
 
-### 🔒 **Security & Performance**
-- **Server-side API Integration** - Binance API keys never exposed to client
-- **Rate Limiting** - Built-in protection against API abuse
-- **Error Handling** - Robust retry logic with exponential backoff
-- **TypeScript** - Full type safety across the entire application
+- 📊 **Real-time Portfolio Management** - Vizualizare automată la 30s cu SWR
+- 🔒 **Securitate Avansată** - Chei API doar server-side, validare Zod, rate limiting
+- 📱 **UI Responsivă** - Design modern cu Tailwind CSS, dark/light theme
+- 📈 **Vizualizări Interactive** - Grafice Chart.js, tabele sortabile cu filtrare
+- 📄 **Export CSV** - Funcționalitate completă de export pentru analiză
+- ⚡ **Performance Optimizat** - Cache inteligent, retry logic, error handling
+- 🚀 **Deploy Ready** - Configurație completă pentru Vercel cu zero-config
 
-### 🎨 **User Experience**
-- **Responsive Design** - Mobile-first approach with Tailwind CSS
-- **Dark/Light Theme** - Persistent theme toggle with smooth transitions
-- **Real-time Updates** - Auto-refresh every 30 seconds + manual refresh
-- **Professional UI** - Clean, modern interface inspired by trading platforms
+## 🏗️ Arhitectură și Stack Tehnologic
 
-## 🛠 Tech Stack
-
-| Category | Technology |
-|----------|------------|
-| **Frontend** | Next.js 14, React 18, TypeScript |
-| **Styling** | Tailwind CSS, Radix UI, Lucide Icons |
-| **Data** | SWR, Binance API Node |
-| **Deployment** | Vercel (Serverless) |
-| **Security** | Server-side API routes, Environment variables |
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Node.js >= 18.0.0
-- npm >= 8.0.0
-- Binance API credentials (API Key + Secret)
-
-### 1. Clone & Install
-
-```bash
-# Clone the repository
-git clone https://github.com/Gzeu/binance-crypto-dashboard.git
-cd binance-crypto-dashboard
-
-# Install dependencies
-npm ci
+```mermaid
+graph TB
+    A[Browser/Client] -->|HTTPS| B[Vercel Edge Network]
+    B --> C[Next.js 14 App Router]
+    C --> D[API Route /api/binance-balance]
+    D -->|Secure Server-Side| E[Binance API]
+    
+    F[Environment Variables] --> D
+    G[SWR Cache] --> C
+    H[Chart.js] --> C
+    I[Tailwind CSS] --> C
+    
+    style E fill:#f9d71c
+    style D fill:#0070f3
+    style C fill:#000
+    style B fill:#000
 ```
 
-### 2. Environment Setup
+### Stack Tehnologic
+
+- **Frontend**: Next.js 14 cu App Router, React 18, TypeScript
+- **Styling**: Tailwind CSS, next-themes pentru dark/light mode
+- **API Integration**: binance-api-node pentru comunicarea securizată cu Binance
+- **State Management**: SWR pentru caching și real-time updates
+- **Data Visualization**: Chart.js cu react-chartjs-2 pentru grafice interactive
+- **Deployment**: Vercel cu serverless functions și edge network
+- **Development**: ESLint, TypeScript strict mode, hot reload
+
+## 🚀 Setup Local
+
+### Prerequisite
+
+- Node.js 18+ și npm/yarn
+- Cont Binance cu API keys (testnet sau mainnet)
+- Git pentru clonarea repository-ului
+
+### 1. Clonează Repository-ul
 
 ```bash
-# Copy environment template
-cp .env.example .env.local
+git clone https://github.com/Gzeu/binance-crypto-dashboard.git
+cd binance-crypto-dashboard
+```
 
-# Edit .env.local with your Binance API credentials
-BINANCE_API_KEY=your_api_key_here
-BINANCE_API_SECRET=your_api_secret_here
+### 2. Instalează Dependențele
+
+```bash
+npm ci
+# sau
+yarn install
+```
+
+### 3. Configurează Environment Variables
+
+```bash
+cp .env.example .env.local
+```
+
+Editează `.env.local` cu cheile tale Binance:
+
+```env
+# Binance API Configuration
+# Obține de la: https://www.binance.com/en/my/settings/api-management
+BINANCE_API_KEY=your_actual_binance_api_key_here
+BINANCE_API_SECRET=your_actual_binance_secret_key_here
+
+# Application Configuration  
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-**⚠️ Security Note:** API credentials are used ONLY on the server side. Never expose them in client-side code.
-
-### 3. Run Development Server
+### 4. Rulează în Development
 
 ```bash
 npm run dev
+# sau
+yarn dev
 ```
 
-🎉 **Dashboard will be available at [http://localhost:3000](http://localhost:3000)**
+Aplicația va fi disponibilă la `http://localhost:3000`
 
-## 🌐 Deploy to Vercel
+## 🔒 Configurarea Cheilor Binance API
 
-### One-Click Deploy
+### Pasul 1: Creează API Key
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Gzeu/binance-crypto-dashboard)
+1. Mergi la [Binance API Management](https://www.binance.com/en/my/settings/api-management)
+2. Creează un nou API key cu numele "Crypto Dashboard"
+3. **Important**: Activează doar "Enable Reading" - NU activa trading!
+4. Copiază API Key și Secret Key
 
-### Manual Deployment
+### Pasul 2: Restricții de Securitate (Recomandate)
+
+- ✅ **Enable Reading**: DA
+- ❌ **Enable Spot & Margin Trading**: NU
+- ❌ **Enable Futures**: NU
+- ✅ **Restrict access to trusted IPs**: DA (opțional, pentru siguranță maximă)
+
+### Pasul 3: Testare
+
+Testează conexiunea:
 
 ```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy to production
-vercel --prod
+curl http://localhost:3000/api/binance-balance
 ```
 
-### Environment Variables on Vercel
-
-1. Go to your Vercel Dashboard
-2. Select your project
-3. Navigate to Settings → Environment Variables
-4. Add the following variables:
-
-```
-BINANCE_API_KEY=your_api_key_here
-BINANCE_API_SECRET=your_api_secret_here
-NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
-```
-
-## 📁 Project Structure
-
-```
-binance-crypto-dashboard/
-├── app/                    # Next.js 14 App Router
-│   ├── api/               # API routes (server-side)
-│   │   └── binance-balance/
-│   │       └── route.ts   # Binance API integration
-│   ├── globals.css        # Global styles
-│   ├── layout.tsx         # Root layout with theme provider
-│   └── page.tsx           # Main dashboard page
-├── components/            # React components
-│   ├── ui/               # Reusable UI components
-│   │   ├── button.tsx
-│   │   └── card.tsx
-│   ├── asset-table.tsx   # Interactive portfolio table
-│   ├── allocation-chart.tsx # Portfolio allocation visualization
-│   ├── navbar.tsx        # Navigation with theme toggle
-│   ├── portfolio-summary.tsx # Portfolio overview cards
-│   └── theme-provider.tsx # Dark/light theme provider
-├── lib/                  # Utilities and types
-│   ├── types.ts          # TypeScript definitions
-│   ├── utils.ts          # Helper functions
-│   └── cn.ts            # Tailwind class merging
-├── next.config.js        # Next.js configuration
-├── tailwind.config.ts    # Tailwind CSS configuration
-├── vercel.json          # Vercel deployment config
-└── package.json         # Project dependencies
-```
-
-## 🔧 API Documentation
-
-### GET `/api/binance-balance`
-
-Returns complete portfolio data from Binance.
-
-**Response:**
+Răspuns de succes:
 ```json
 {
-  "totalValue": 5000.25,
-  "change24h": 2.5,
-  "balances": [
-    {
-      "asset": "BTC",
-      "total": 0.15,
-      "priceUSDT": 45000.00,
-      "valueUSDT": 6750.00
-    }
-  ]
+  "balances": [...],
+  "totalPortfolioUSDT": "1234.56",
+  "accountType": "SPOT",
+  "canTrade": true
 }
 ```
 
-**Features:**
-- Rate limiting protection
-- Error handling with retry logic
-- Real-time price data from Binance
-- Server-side only execution
+## 🚀 Deploy pe Vercel
 
-## 🔐 Security Best Practices
-
-### ✅ Implemented Security Measures
-
-- **Server-side API Integration** - API keys never reach the browser
-- **Environment Variable Encryption** - Credentials stored securely in Vercel
-- **HTTPS Enforcement** - SSL/TLS encryption for all communications
-- **Rate Limiting** - Protection against API abuse
-- **CORS Protection** - Secure cross-origin resource sharing
-- **Input Validation** - Sanitized API inputs and outputs
-
-### 🛡️ Security Checklist
-
-- [ ] API credentials configured in environment variables only
-- [ ] `.env.local` added to `.gitignore`
-- [ ] Vercel environment variables are encrypted
-- [ ] API permissions set to "Read Only" on Binance
-- [ ] Production deployment uses HTTPS
-
-## ⚡ Performance Optimizations
-
-- **Serverless Architecture** - Auto-scaling with zero cold starts
-- **Edge Caching** - Global CDN distribution via Vercel
-- **Code Splitting** - Lazy loading for optimal bundle sizes
-- **Image Optimization** - Next.js automatic image optimization
-- **SWR Caching** - Intelligent client-side data caching
-
-## 📊 Monitoring & Analytics
-
-### Built-in Monitoring
-
-- **Vercel Analytics** - Real-time performance metrics
-- **Error Tracking** - Automatic error logging and retry
-- **API Health Checks** - Monitor Binance API connectivity
-- **Performance Metrics** - Track load times and user interactions
-
-### Custom Monitoring Setup
+### Metoda 1: Vercel CLI (Recomandată)
 
 ```bash
-# Enable Vercel Analytics
-npm install @vercel/analytics
+# Instalează Vercel CLI
+npm i -g vercel
 
-# Add to layout.tsx
-import { Analytics } from '@vercel/analytics/react'
+# Login în Vercel
+vercel login
+
+# Deploy
+vercel --prod
 ```
 
-## 🛟 Troubleshooting
+### Metoda 2: GitHub Integration
 
-### Common Issues
+1. Conectează repository-ul la Vercel
+2. Setează environment variables în Vercel Dashboard:
+   - `BINANCE_API_KEY`
+   - `BINANCE_API_SECRET`  
+   - `NEXT_PUBLIC_APP_URL` (URL-ul aplicației deployed)
+3. Deploy automat la fiecare push pe `main`
 
-**API Connection Failed**
-- ✅ Verify Binance API credentials
-- ✅ Check API key permissions (needs "Read" access)
-- ✅ Ensure IP whitelist includes Vercel IPs
+### Variabile de Mediu în Vercel
 
-**Build Errors**
-- ✅ Run `npm run type-check` for TypeScript errors
-- ✅ Ensure all environment variables are set
-- ✅ Check Node.js version compatibility (>=18.0.0)
+```bash
+# Via Vercel CLI
+vercel env add BINANCE_API_KEY
+vercel env add BINANCE_API_SECRET
+vercel env add NEXT_PUBLIC_APP_URL
+```
 
-**Deployment Issues**
-- ✅ Verify Vercel environment variables
-- ✅ Check build logs in Vercel dashboard
-- ✅ Ensure serverless function timeout limits
+Sau manual în [Vercel Dashboard](https://vercel.com/dashboard) → Project Settings → Environment Variables
+
+## 📊 API Documentation
+
+### GET /api/binance-balance
+
+Returnează balanțele portofoliului crypto cu conversie în USDT.
+
+#### Response Schema
+
+```typescript
+interface PortfolioData {
+  balances: AssetBalance[];
+  totalPortfolioUSDT: string;
+  accountType: string;
+  canTrade: boolean;
+  canWithdraw: boolean;
+  canDeposit: boolean;
+  updateTime: string;
+  serverTime: string;
+  cached?: boolean;
+}
+
+interface AssetBalance {
+  asset: string;           // "BTC", "ETH", etc.
+  free: string;            // Balanță disponibilă
+  locked: string;          // Balanță blocată în ordere
+  total: string;           // Total = free + locked
+  priceUSDT: string;       // Preț actual în USDT
+  valueUSDT: string;       // Valoare totală în USDT
+}
+```
+
+#### Features API
+
+- ✅ **Caching**: 15 secunde pentru respectarea rate limits
+- ✅ **Retry Logic**: Exponential backoff cu 3 încercări
+- ✅ **Error Handling**: Mesaje sanitarizate, fără expunerea cheilor
+- ✅ **Rate Limiting**: Respectă limitele Binance (1200 requests/min)
+- ✅ **Security**: Validare Zod, chei doar server-side
+
+## 🎨 UI Components
+
+### PortfolioSummary
+- Valoare totală portofoliu în USDT
+- Numărul de active cu balance > 0  
+- Status cont (trading enabled/disabled)
+- Indicator cache și timp ultimei actualizări
+
+### AssetTable
+- Tabel sortabil după asset, balance, preț, valoare
+- Căutare în timp real după nume asset
+- Afișare responsivă (mobile-friendly)
+- Formatare inteligentă numere (locale-aware)
+
+### AllocationChart
+- Grafic pie chart cu Chart.js
+- Top 10 active + "Others" pentru restul
+- Tooltip-uri interactive cu percentaje
+- Design responsive cu center text
+
+### ThemeToggle
+- Suport light/dark/system theme
+- Persistență cu next-themes
+- Tranziții smooth între teme
+- Icons intuitive (Sun/Moon/Monitor)
+
+## 🔧 Development
+
+### Scripts Disponibile
+
+```bash
+npm run dev         # Development server cu hot reload
+npm run build       # Build pentru producție
+npm run start       # Start production server
+npm run lint        # ESLint checking
+npm run type-check  # TypeScript validation
+```
+
+### Structura Proiectului
+
+```
+binance-crypto-dashboard/
+├── app/
+│   ├── api/binance-balance/route.ts    # API route securizat
+│   ├── globals.css                     # Stiluri globale + CSS variables
+│   ├── layout.tsx                      # Root layout cu ThemeProvider
+│   └── page.tsx                        # Dashboard principal
+├── components/
+│   ├── AllocationChart.tsx             # Grafic portofoliu Chart.js
+│   ├── AssetTable.tsx                  # Tabel active sortabil
+│   ├── PortfolioSummary.tsx           # Cards cu sumar portofoliu
+│   ├── ThemeProvider.tsx              # Context pentru teme
+│   └── ThemeToggle.tsx                # Switch light/dark
+├── lib/
+│   ├── types.ts                       # TypeScript interfaces
+│   └── csv.ts                         # Utilitar export CSV
+├── public/                            # Static assets
+├── .env.example                       # Template env variables
+├── next.config.js                     # Configurare Next.js
+├── tailwind.config.js                 # Configurare Tailwind CSS
+└── tsconfig.json                      # TypeScript config
+```
+
+## 🛡️ Securitate și Best Practices
+
+### API Security
+- ✅ Chei Binance doar server-side (nu în browser)
+- ✅ Validare strictă cu schema Zod
+- ✅ Rate limiting și cache pentru protecție
+- ✅ Error messages sanitarizate
+- ✅ HTTPS obligatoriu în producție
+- ✅ Headers de securitate configurate
+
+### Environment Variables
+- ❌ **NICIODATĂ** commite `.env.local` în Git
+- ✅ Folosește `.env.example` pentru documentație
+- ✅ Rotește cheile API periodic
+- ✅ Monitorizează activitatea API din Binance dashboard
+
+### Rate Limiting
+- Binance permite 1200 requests/minut pentru API spot
+- Cache de 15 secunde pentru reducerea calls
+- Exponential backoff la erori 429
+- Monitoring și logging pentru debugging
+
+## 🚨 Troubleshooting
+
+### Erori Comune
+
+#### 1. "Invalid API key format"
+- Verifică că API key e corect copiat din Binance
+- Nu are spații sau caractere extra
+- Key-ul e activ (nu expirat)
+
+#### 2. "Signature verification failed"
+- Secret key incorect
+- Probleme de sincronizare timp server
+- Configurare incorectă `useServerTime: true`
+
+#### 3. "Rate limit exceeded"
+- Prea multe requests către Binance
+- Cache-ul funcționează corect?
+- Verifică alte aplicații care folosesc aceleași chei
+
+#### 4. Build Errors
+```bash
+# Clearing cache și reinstalare
+rm -rf .next node_modules
+npm ci
+npm run build
+```
 
 ### Debug Mode
 
+Activează logging detaliat:
+
 ```bash
-# Enable debug logging
-NEXT_PUBLIC_DEBUG=true npm run dev
+# .env.local
+NEXT_PUBLIC_DEBUG=true
 ```
+
+## 📚 Referințe și Documentație
+
+- 📖 [Binance API Documentation](https://binance-docs.github.io/apidocs/spot/en/)
+- 🔗 [binance-api-node Library](https://github.com/Ashlar/binance-api-node)
+- ⚡ [Next.js 14 Documentation](https://nextjs.org/docs)
+- 🎨 [Tailwind CSS Documentation](https://tailwindcss.com/docs)
+- 📊 [Chart.js Documentation](https://www.chartjs.org/docs/)
+- 🚀 [Vercel Deployment Guide](https://vercel.com/docs)
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
+Contribuțiile sunt binevenite! Pentru schimbări majore:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork repository-ul
+2. Creează branch pentru feature (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add some amazing feature'`)
+4. Push la branch (`git push origin feature/amazing-feature`)
+5. Deschide Pull Request
 
-### Development Guidelines
+## 📄 Licență
 
-- Follow TypeScript strict mode
-- Use ESLint and Prettier for code formatting
-- Write tests for new components
-- Update documentation for new features
+Acest proiect este licențiat sub MIT License - vezi fișierul [LICENSE](LICENSE) pentru detalii.
 
-## 📄 License
+## 👨‍💻 Autor
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+**George Pricop** - [Gzeu](https://github.com/Gzeu)
 
-## 🔗 Links
-
-- **Live Demo:** [https://binance-crypto-dashboard.vercel.app](https://binance-crypto-dashboard.vercel.app)
-- **Documentation:** [Binance API Docs](https://binance-docs.github.io/apidocs/spot/en/)
-- **Next.js 14:** [Next.js Documentation](https://nextjs.org/docs)
-- **Vercel:** [Deployment Documentation](https://vercel.com/docs)
-
-## ⭐ Star History
-
-If this project helped you, please consider giving it a ⭐!
+- 📧 Email: contact@georgepricop.com
+- 🌐 Website: [georgepricop.com](https://georgepricop.com)
+- 💼 LinkedIn: [George Pricop](https://linkedin.com/in/georgepricop)
 
 ---
 
-**Built with ❤️ by [George Pricop](https://github.com/Gzeu)**
+⭐ **Star acest repository dacă ți-a fost util!**
 
-*Ready for production • Secure by default • Scalable architecture*
+*Construit cu ❤️ în București, România*
