@@ -1,348 +1,185 @@
-import { NextRequest, NextResponse } from 'next/server'
-import Binance from 'binance-api-node'
-import { ApiResponse, PortfolioData, BalanceData } from '@/lib/types'
+import { NextResponse } from 'next/server';
+import Binance from 'binance-api-node';
+import { z } from 'zod';
 
-// Rate limiting map to track requests
-const rateLimitMap = new Map<string, number[]>()
+// Validation schema for environment variables
+const envSchema = z.object({
+  BINANCE_API_KEY: z.string().min(1, 'BINANCE_API_KEY is required'),
+  BINANCE_API_SECRET: z.string().min(1, 'BINANCE_API_SECRET is required'),
+});
 
-function rateLimit(identifier: string, limit: number = 100, window: number = 60000): boolean {
-  const now = Date.now()
-  const windowStart = now - window
-  
-  const requests = rateLimitMap.get(identifier) || []
-  const recentRequests = requests.filter(time => time > windowStart)
-  
-  if (recentRequests.length >= limit) {
-    return false
-  }
-  
-  recentRequests.push(now)
-  rateLimitMap.set(identifier, recentRequests)
-  return true
+// Cache pentru rate limiting
+let lastFetchTime = 0;
+let cachedData: any = null;
+const CACHE_DURATION = 15000; // 15 seconds cache
+
+// Retry configuration
+const RETRY_ATTEMPTS = 3;
+const RETRY_DELAY = 1000; // 1 second base delay
+
+// Helper function for exponential backoff
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function validateEnvironment(): { isValid: boolean; error?: string } {
-  if (!process.env.BINANCE_API_KEY) {
-    console.error('Missing Binance API credentials: BINANCE_API_KEY')
-    return { isValid: false, error: 'BINANCE_API_KEY is not configured' }
-  }
-  
-  if (!process.env.BINANCE_API_SECRET) {
-    console.error('Missing Binance API credentials: BINANCE_API_SECRET')
-    return { isValid: false, error: 'BINANCE_API_SECRET is not configured' }
-  }
-  
-  return { isValid: true }
-}
-
-async function createBinanceClient() {
-  const validation = validateEnvironment()
-  if (!validation.isValid) {
-    throw new Error(validation.error)
-  }
-
-  return Binance({
-    apiKey: process.env.BINANCE_API_KEY!,
-    apiSecret: process.env.BINANCE_API_SECRET!,
-  })
-}
-
-async function retryOperation<T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> {
-  let lastError: Error
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+// Helper function to retry API calls
+async function retryApiCall<T>(fn: () => Promise<T>, attempts: number = RETRY_ATTEMPTS): Promise<T> {
+  for (let i = 0; i < attempts; i++) {
     try {
-      return await operation()
-    } catch (error) {
-      lastError = error as Error
+      return await fn();
+    } catch (error: any) {
+      const isLastAttempt = i === attempts - 1;
+      const shouldRetry = error?.code === -1003 || error?.code === 429 || error?.code >= 500;
       
-      console.error(`Binance API error (attempt ${attempt + 1}):`, lastError.message)
-      
-      if (attempt === maxRetries) {
-        throw lastError
+      if (isLastAttempt || !shouldRetry) {
+        throw error;
       }
       
       // Exponential backoff with jitter
-      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000
-      console.log(`Retrying in ${delay}ms...`)
-      await new Promise(resolve => setTimeout(resolve, delay))
+      const delayMs = RETRY_DELAY * Math.pow(2, i) + Math.random() * 1000;
+      await delay(delayMs);
     }
   }
   
-  throw lastError!
+  throw new Error('Max retry attempts reached');
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
-  const startTime = Date.now()
-  
+// GET handler for portfolio balance
+export async function GET() {
   try {
-    // Rate limiting
-    const clientIP = request.ip || request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
-    if (!rateLimit(clientIP, 100, 60000)) {
-      console.warn(`Rate limit exceeded for IP: ${clientIP}`)
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'Rate limit exceeded. Please try again later.',
-          timestamp: new Date().toISOString()
-        } satisfies ApiResponse<null>,
-        { status: 429 }
-      )
+    // Validate environment variables
+    const env = envSchema.parse({
+      BINANCE_API_KEY: process.env.BINANCE_API_KEY,
+      BINANCE_API_SECRET: process.env.BINANCE_API_SECRET,
+    });
+
+    // Check cache first to respect rate limits
+    const now = Date.now();
+    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
+      return NextResponse.json({
+        ...cachedData,
+        cached: true,
+        cacheAge: now - lastFetchTime,
+      });
     }
 
-    // Validate environment before creating client
-    const validation = validateEnvironment()
-    if (!validation.isValid) {
-      console.error('Environment validation failed:', validation.error)
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'API credentials not configured. Please check environment variables.',
-          timestamp: new Date().toISOString()
-        } satisfies ApiResponse<null>,
-        { status: 500 }
-      )
-    }
+    // Initialize Binance client with server time synchronization
+    const client = Binance({
+      apiKey: env.BINANCE_API_KEY,
+      apiSecret: env.BINANCE_API_SECRET,
+      useServerTime: true,
+      recvWindow: 60000, // 60 seconds receive window
+    });
 
-    // Create Binance client
-    const client = await createBinanceClient()
-    
-    console.log('Fetching Binance data...')
-    
-    // Fetch data with retry logic
-    const [accountInfo, prices, futuresAccount] = await Promise.all([
-      retryOperation(() => client.accountInfo(), 3, 1000),
-      retryOperation(() => client.prices(), 3, 1000),
-      retryOperation(() => (client as any).futuresAccountInfo(), 3, 1000).catch(error => {
-        console.error('Error fetching futures account:', error.message);
-        return { positions: [] };
+    // Fetch account information with retry logic
+    const [accountInfo, exchangeInfo] = await Promise.all([
+      retryApiCall(() => client.accountInfo()),
+      retryApiCall(() => client.exchangeInfo()),
+    ]);
+
+    // Get current prices for USDT conversion
+    const prices = await retryApiCall(() => client.prices());
+
+    // Process balances - filter out zero balances and format
+    const balances = accountInfo.balances
+      .filter((balance: any) => {
+        const total = parseFloat(balance.free) + parseFloat(balance.locked);
+        return total > 0.00001; // Filter out dust amounts
       })
-    ])
-
-    console.log(`Received ${accountInfo.balances.length} balances and ${Object.keys(prices).length} prices`)
-
-    // Process spot balance data
-    const processBalances = (balances: { asset: string; free: string; locked: string }[], isFutures = false) => {
-      return balances
-        .map(balance => {
-          const total = parseFloat(balance.free) + parseFloat(balance.locked)
-          if (total <= 0) return null
-
-          // For futures, we might need to handle the asset name differently
-          const asset = isFutures && balance.asset.endsWith('_PERP') 
-            ? balance.asset.replace('_PERP', '') 
-            : balance.asset;
-
+      .map((balance: any) => {
+        const asset = balance.asset;
+        const free = parseFloat(balance.free);
+        const locked = parseFloat(balance.locked);
+        const total = free + locked;
+        
+        // Get USDT price
+        let priceUSDT = 0;
+        if (asset === 'USDT') {
+          priceUSDT = 1;
+        } else if (asset === 'BUSD') {
+          priceUSDT = 1; // Assuming BUSD ≈ 1 USDT
+        } else {
           // Try different price pairs
-          const priceKeys = [
-            `${asset}USDT`,
-            `${asset}BUSD`,
-            `${asset}USDC`,
-            `${asset}USD`
-          ]
+          const priceKey = `${asset}USDT`;
+          const btcPriceKey = `${asset}BTC`;
           
-          let priceUSDT = 0
-          for (const key of priceKeys) {
-            if (prices[key]) {
-              priceUSDT = parseFloat(prices[key])
-              break
-            }
+          if (prices[priceKey]) {
+            priceUSDT = parseFloat(prices[priceKey]);
+          } else if (prices[btcPriceKey] && prices['BTCUSDT']) {
+            const btcPrice = parseFloat(prices['BTCUSDT']);
+            const assetBtcPrice = parseFloat(prices[btcPriceKey]);
+            priceUSDT = assetBtcPrice * btcPrice;
           }
-
-        // Handle stablecoins as $1
-        if (['USDT', 'BUSD', 'USDC', 'USD', 'TUSD', 'USDP'].includes(asset)) {
-          priceUSDT = 1
         }
-
-          const valueUSDT = total * priceUSDT
-          
-          return {
-            asset,
-            free: parseFloat(balance.free),
-            locked: parseFloat(balance.locked),
-            total,
-            priceUSDT,
-            valueUSDT,
-            isFutures
-          }
-        })
-        .filter((balance): balance is NonNullable<typeof balance> => {
-          return balance !== null && balance.valueUSDT > 0.01;
-        })
-        .sort((a, b) => b.valueUSDT - a.valueUSDT)
-    }
-
-    // Process spot balances
-    const processedBalances = processBalances(accountInfo.balances)
-      .filter((balance): balance is NonNullable<typeof balance> => {
-        return balance !== null && balance.valueUSDT > 0.01;
+        
+        const valueUSDT = total * priceUSDT;
+        
+        return {
+          asset,
+          free: free.toFixed(8),
+          locked: locked.toFixed(8),
+          total: total.toFixed(8),
+          priceUSDT: priceUSDT.toFixed(6),
+          valueUSDT: valueUSDT.toFixed(2),
+        };
       })
-      .sort((a, b) => b.valueUSDT - a.valueUSDT)
+      .sort((a: any, b: any) => parseFloat(b.valueUSDT) - parseFloat(a.valueUSDT));
 
-    console.log(`Processed ${processedBalances.length} non-zero balances`)
+    // Calculate total portfolio value
+    const totalPortfolioUSDT = balances.reduce(
+      (sum: number, balance: any) => sum + parseFloat(balance.valueUSDT),
+      0
+    );
 
-    // Process futures positions
-    const futuresPositions = futuresAccount && 
-      typeof futuresAccount === 'object' && 
-      'positions' in futuresAccount && 
-      Array.isArray(futuresAccount.positions)
-        ? futuresAccount.positions 
-        : [];
+    // Prepare response data
+    const responseData = {
+      balances,
+      totalPortfolioUSDT: totalPortfolioUSDT.toFixed(2),
+      accountType: accountInfo.accountType,
+      canTrade: accountInfo.canTrade,
+      canWithdraw: accountInfo.canWithdraw,
+      canDeposit: accountInfo.canDeposit,
+      updateTime: new Date(accountInfo.updateTime).toISOString(),
+      serverTime: new Date().toISOString(),
+      cached: false,
+    };
 
-    const futuresBalances = futuresPositions
-      .filter((p: any) => parseFloat(p.positionAmt) !== 0)
-      .map((p: any) => ({
-        asset: p.symbol.replace('USDT', '').replace('BUSD', '').replace('PERP', '').replace('_', ''),
-        free: 0,
-        locked: parseFloat(p.positionAmt),
-        total: Math.abs(parseFloat(p.positionAmt)),
-        priceUSDT: parseFloat(p.markPrice),
-        valueUSDT: Math.abs(parseFloat(p.positionAmt) * parseFloat(p.markPrice)),
-        isFutures: true,
-        positionAmt: parseFloat(p.positionAmt),
-        entryPrice: parseFloat(p.entryPrice),
-        markPrice: parseFloat(p.markPrice),
-        unRealizedProfit: parseFloat(p.unRealizedProfit)
-      }))
-      .filter((b: any) => b.valueUSDT > 0.01)
-      .sort((a: any, b: any) => b.valueUSDT - a.valueUSDT)
+    // Update cache
+    cachedData = responseData;
+    lastFetchTime = now;
 
-    // Calculate total values
-    const spotTotal = processedBalances.reduce((sum, b) => sum + b.valueUSDT, 0)
-    const futuresTotal = futuresBalances.reduce((sum: number, b: any) => sum + b.valueUSDT, 0)
-    const totalValue = spotTotal + futuresTotal
+    return NextResponse.json(responseData);
+  
+  } catch (error: any) {
+    console.error('Binance API Error:', {
+      message: error.message,
+      code: error.code,
+      timestamp: new Date().toISOString(),
+    });
 
-    // Combine all balances with allocations
-    const allBalances = [
-      ...processedBalances.map(balance => ({
-        ...balance,
-        allocation: totalValue > 0 ? (balance.valueUSDT / totalValue) * 100 : 0
-      })),
-      ...futuresBalances.map((balance: any) => ({
-        ...balance,
-        allocation: totalValue > 0 ? (balance.valueUSDT / totalValue) * 100 : 0
-      }))
-    ]
+    // Return sanitized error response
+    const errorMessage = error.code === -2014
+      ? 'Invalid API key format'
+      : error.code === -1022
+      ? 'Invalid signature'
+      : error.code === -1003
+      ? 'Rate limit exceeded. Please try again later.'
+      : error.code === 429
+      ? 'Too many requests. Please try again later.'
+      : 'Unable to fetch portfolio data';
 
-    // Simulated 24h change (in production, you'd fetch this from price history)
-    const spotChange24h = Math.random() * 10 - 5
-    const futuresChange24h = Math.random() * 10 - 5
-    const totalChange24h = spotTotal > 0 || futuresTotal > 0 
-      ? (spotTotal * spotChange24h + futuresTotal * futuresChange24h) / (spotTotal + futuresTotal)
-      : 0
-
-    const portfolioData: PortfolioData = {
-      accounts: {
-        spot: {
-          type: 'spot',
-          balances: allBalances.filter(b => !b.isFutures),
-          totalValue: spotTotal,
-          totalChange24h: spotChange24h,
-          timestamp: new Date().toISOString()
-        },
-        margin: {
-          type: 'margin',
-          balances: [],
-          totalValue: 0,
-          totalChange24h: 0,
-          timestamp: new Date().toISOString()
-        },
-        futures: {
-          type: 'futures',
-          balances: allBalances.filter(b => b.isFutures),
-          totalValue: futuresTotal,
-          totalChange24h: futuresChange24h,
-          timestamp: new Date().toISOString()
-        }
+    return NextResponse.json(
+      {
+        error: errorMessage,
+        code: error.code || 'UNKNOWN_ERROR',
+        timestamp: new Date().toISOString(),
       },
-      totalValue,
-      totalChange24h,
-      timestamp: new Date().toISOString(),
-      performance: {
-        daily: [],
-        weekly: [],
-        monthly: []
-      }
-    }
-
-    const response: ApiResponse<PortfolioData> = {
-      success: true,
-      data: portfolioData,
-      timestamp: new Date().toISOString(),
-    }
-
-    // Add response time header
-    const responseTime = Date.now() - startTime
-    console.log(`Request completed in ${responseTime}ms`)
-    
-    const nextResponse = NextResponse.json(response)
-    nextResponse.headers.set('X-Response-Time', `${responseTime}ms`)
-    nextResponse.headers.set('Cache-Control', 'no-store, must-revalidate')
-    
-    return nextResponse
-
-  } catch (error) {
-    const responseTime = Date.now() - startTime
-    console.error('Binance API Error Details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
-      responseTime: `${responseTime}ms`
-    })
-    
-    let errorMessage = 'Failed to fetch portfolio data'
-    let statusCode = 500
-    
-    if (error instanceof Error) {
-      const message = error.message.toLowerCase()
-      
-      if (message.includes('invalid api-key') || message.includes('unauthorized')) {
-        errorMessage = 'Invalid API credentials. Please check your Binance API key.'
-        statusCode = 401
-      } else if (message.includes('timestamp') || message.includes('recvwindow')) {
-        errorMessage = 'Server time synchronization error. Please try again.'
-        statusCode = 400
-      } else if (message.includes('configured') || message.includes('not found')) {
-        errorMessage = 'API configuration error. Environment variables may be missing.'
-        statusCode = 500
-      } else if (message.includes('enotfound') || message.includes('network') || message.includes('timeout')) {
-        errorMessage = 'Network connection error. Please check your internet connection.'
-        statusCode = 503
-      } else if (message.includes('rate limit') || message.includes('too many requests')) {
-        errorMessage = 'Binance API rate limit exceeded. Please wait before retrying.'
-        statusCode = 429
-      }
-    }
-
-    const errorResponse: ApiResponse<null> = {
-      success: false,
-      error: errorMessage,
-      timestamp: new Date().toISOString(),
-    }
-
-    const nextResponse = NextResponse.json(errorResponse, { status: statusCode })
-    nextResponse.headers.set('X-Response-Time', `${Date.now() - startTime}ms`)
-    
-    return nextResponse
+      { status: error.code === -1003 || error.code === 429 ? 429 : 500 }
+    );
   }
 }
 
 // Health check endpoint
-export async function HEAD(request: NextRequest): Promise<NextResponse> {
-  const validation = validateEnvironment()
-  
-  if (!validation.isValid) {
-    return new NextResponse(null, { 
-      status: 503,
-      headers: { 'X-Health-Status': 'unhealthy', 'X-Error': validation.error || 'Unknown error' }
-    })
-  }
-  
-  return new NextResponse(null, { 
-    status: 200,
-    headers: { 'X-Health-Status': 'healthy' }
-  })
+export async function HEAD() {
+  return new NextResponse(null, { status: 200 });
 }
