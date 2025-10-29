@@ -7,18 +7,42 @@ export interface BalanceData {
   total: number;
   priceUSDT: number;
   valueUSDT: number;
+  isFutures?: boolean;
   change24h?: number;
   allocation?: number;
+  unrealizedProfit?: number;
+  marginLevel?: number;
+  positionAmt?: number;
+  entryPrice?: number;
+  markPrice?: number;
+  leverage?: number;
 }
 
-// Backward-compatible alias used by UI components
-export type AssetBalance = BalanceData;
+export type AccountType = 'spot' | 'margin' | 'futures' | 'earn' | 'funding';
 
-export interface PortfolioData {
+export interface AccountBalance {
+  type: AccountType;
   balances: BalanceData[];
   totalValue: number;
   totalChange24h: number;
   timestamp: string;
+}
+
+export interface PortfolioData {
+  accounts: {
+    spot: AccountBalance;
+    margin: AccountBalance;
+    futures: AccountBalance;
+    // Add other account types if needed
+  };
+  totalValue: number;
+  totalChange24h: number;
+  timestamp: string;
+  performance: {
+    daily: number[];
+    weekly: number[];
+    monthly: number[];
+  };
 }
 
 export interface ApiResponse<T> {
@@ -27,6 +51,9 @@ export interface ApiResponse<T> {
   error?: string;
   timestamp: string;
 }
+
+// For backward compatibility
+export type AssetBalance = BalanceData;
 
 export interface BinanceAccountInfo {
   makerCommission: number;

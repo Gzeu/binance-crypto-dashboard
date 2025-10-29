@@ -10,11 +10,21 @@ interface PortfolioSummaryProps {
 }
 
 export function PortfolioSummary({ data }: PortfolioSummaryProps) {
+  // Calculate totals from all accounts
   const totalValue = data?.totalValue || 0
-  // Fix: Use totalChange24h from PortfolioData type, with fallback to change24h for compatibility
-  const change24h = (data as any)?.change24h ?? data?.totalChange24h ?? 0
-  const assetCount = data?.balances?.length || 0
-  const nonZeroAssets = data?.balances?.filter(b => b.valueUSDT > 0).length || 0
+  const change24h = data?.totalChange24h || 0
+  
+  // Calculate total assets across all accounts
+  const allBalances = data ? Object.values(data.accounts).flatMap(account => account.balances) : []
+  const assetCount = allBalances.length
+  const nonZeroAssets = allBalances.filter(b => b.valueUSDT > 0).length
+  
+  // Debug log to verify data
+  if (process.env.NODE_ENV === 'development') {
+    console.log('PortfolioSummary - Data:', data)
+    console.log('PortfolioSummary - Total Value:', totalValue)
+    console.log('PortfolioSummary - 24h Change:', change24h)
+  }
 
   const isPositive = change24h >= 0
 
@@ -74,7 +84,12 @@ export function PortfolioSummary({ data }: PortfolioSummaryProps) {
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">
-            {data?.balances?.find(b => b.valueUSDT > 0)?.asset || 'N/A'}
+            {allBalances.length > 0 
+              ? allBalances
+                  .filter(b => b.valueUSDT > 0)
+                  .sort((a, b) => b.valueUSDT - a.valueUSDT)[0]?.asset || 'N/A'
+              : 'N/A'
+            }
           </div>
           <p className="text-xs text-muted-foreground">
             Highest value asset

@@ -7,9 +7,10 @@ import { formatCurrency, formatPercentage } from "@/lib/utils"
 
 interface AllocationChartProps {
   balances: AssetBalance[]
+  className?: string
 }
 
-export function AllocationChart({ balances }: AllocationChartProps) {
+export function AllocationChart({ balances, className = '' }: AllocationChartProps) {
   const chartData = useMemo(() => {
     const totalValue = balances.reduce((sum, balance) => sum + balance.valueUSDT, 0)
     
@@ -33,7 +34,7 @@ export function AllocationChart({ balances }: AllocationChartProps) {
   const totalValue = chartData.reduce((sum, item) => sum + item.value, 0)
 
   return (
-    <Card>
+    <Card className={`w-full ${className}`}>
       <CardHeader>
         <CardTitle>Portfolio Allocation</CardTitle>
         <CardDescription>Distribution of your crypto assets</CardDescription>

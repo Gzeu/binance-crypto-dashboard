@@ -9,6 +9,7 @@ import { formatCurrency } from "@/lib/utils"
 
 interface AssetTableProps {
   balances: BalanceData[]
+  accountType?: 'spot' | 'margin' | 'futures' | 'earn' | 'funding'
 }
 
 type SortKey = keyof Pick<BalanceData, 'asset' | 'total' | 'valueUSDT' | 'priceUSDT'>
