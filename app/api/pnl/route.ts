@@ -65,7 +65,7 @@ function computeRealizedPnlAverageCost(trades: Trade[], getPriceUSD: (asset: str
   let totalFees = 0
   const breakdown: PnlBreakdown[] = []
 
-  for (const [symbol, list] of bySymbol.entries()) {
+  Array.from(bySymbol.entries()).forEach(([symbol, list]) => {
     list.sort((a, b) => a.time - b.time)
 
     let positionQty = 0
@@ -100,7 +100,7 @@ function computeRealizedPnlAverageCost(trades: Trade[], getPriceUSD: (asset: str
     totalRealized += realized
     totalFees += fees
     breakdown.push({ symbol, realizedPnlUSD: realized, feesUSD: fees, trades: list.length })
-  }
+  })
 
   return { totalRealized, totalFees, breakdown }
 }
