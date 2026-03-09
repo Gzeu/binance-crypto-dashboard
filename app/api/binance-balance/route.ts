@@ -71,14 +71,22 @@ export async function GET() {
       recvWindow: 60000, // 60 seconds receive window
     });
 
-    // Fetch account information with retry logic
-    const [accountInfo, exchangeInfo] = await Promise.all([
+    // Fetch account information and daily stats with retry logic
+    const [accountInfo, exchangeInfo, dailyStats] = await Promise.all([
       retryApiCall(() => client.accountInfo()),
       retryApiCall(() => client.exchangeInfo()),
+      retryApiCall(() => client.dailyStats()),
     ]);
 
     // Get current prices for USDT conversion
     const prices = await retryApiCall(() => client.prices());
+
+    const changeMap = new Map<string, string>();
+    if (Array.isArray(dailyStats)) {
+      dailyStats.forEach((stat: any) => {
+        changeMap.set(stat.symbol, stat.priceChangePercent);
+      });
+    }
 
     // Process balances - filter out zero balances and format
     const balances = accountInfo.balances
@@ -92,12 +100,14 @@ export async function GET() {
         const locked = parseFloat(balance.locked);
         const total = free + locked;
         
-        // Get USDT price
+        // Get USDT price and 24h change
         let priceUSDT = 0;
+        let change24h = "0.00";
+
         if (asset === 'USDT') {
           priceUSDT = 1;
-        } else if (asset === 'BUSD') {
-          priceUSDT = 1; // Assuming BUSD ≈ 1 USDT
+        } else if (asset === 'BUSD' || asset === 'USDC' || asset === 'FDUSD') {
+          priceUSDT = 1; 
         } else {
           // Try different price pairs
           const priceKey = `${asset}USDT`;
@@ -105,10 +115,12 @@ export async function GET() {
           
           if (prices[priceKey]) {
             priceUSDT = parseFloat(prices[priceKey]);
+            change24h = changeMap.get(priceKey) || "0.00";
           } else if (prices[btcPriceKey] && prices['BTCUSDT']) {
             const btcPrice = parseFloat(prices['BTCUSDT']);
             const assetBtcPrice = parseFloat(prices[btcPriceKey]);
             priceUSDT = assetBtcPrice * btcPrice;
+            change24h = changeMap.get(btcPriceKey) || "0.00";
           }
         }
         
@@ -121,6 +133,7 @@ export async function GET() {
           total: total.toFixed(8),
           priceUSDT: priceUSDT.toFixed(6),
           valueUSDT: valueUSDT.toFixed(2),
+          change24h,
         };
       })
       .sort((a: any, b: any) => parseFloat(b.valueUSDT) - parseFloat(a.valueUSDT));
