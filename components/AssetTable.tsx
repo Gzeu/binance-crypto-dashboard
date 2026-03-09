@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { AssetTableProps } from '@/lib/types';
 
-type SortField = 'asset' | 'total' | 'valueUSDT' | 'priceUSDT';
+type SortField = 'asset' | 'total' | 'valueUSDT' | 'priceUSDT' | 'change24h';
 type SortDirection = 'asc' | 'desc';
 
 export function AssetTable({ balances }: AssetTableProps) {
@@ -38,6 +38,10 @@ export function AssetTable({ balances }: AssetTableProps) {
         case 'priceUSDT':
           aValue = parseFloat(a.priceUSDT);
           bValue = parseFloat(b.priceUSDT);
+          break;
+        case 'change24h':
+          aValue = parseFloat(a.change24h || "0");
+          bValue = parseFloat(b.change24h || "0");
           break;
         default:
           return 0;
@@ -123,6 +127,14 @@ export function AssetTable({ balances }: AssetTableProps) {
                   Price {getSortIcon('priceUSDT')}
                 </button>
               </th>
+              <th className="text-right py-3 px-2 hidden sm:table-cell">
+                <button
+                  onClick={() => handleSort('change24h')}
+                  className="flex items-center gap-2 font-medium text-muted-foreground hover:text-foreground transition-colors ml-auto"
+                >
+                  24h {getSortIcon('change24h')}
+                </button>
+              </th>
               <th className="text-right py-3 px-2">
                 <button
                   onClick={() => handleSort('valueUSDT')}
@@ -170,6 +182,21 @@ export function AssetTable({ balances }: AssetTableProps) {
                       maximumFractionDigits: 6
                     })}
                   </div>
+                </td>
+                <td className="py-3 px-2 text-right hidden sm:table-cell">
+                  {parseFloat(balance.change24h || "0") > 0 ? (
+                    <div className="font-medium text-green-500">
+                      +{parseFloat(balance.change24h || "0").toFixed(2)}%
+                    </div>
+                  ) : parseFloat(balance.change24h || "0") < 0 ? (
+                    <div className="font-medium text-red-500">
+                      {parseFloat(balance.change24h || "0").toFixed(2)}%
+                    </div>
+                  ) : (
+                    <div className="font-medium text-muted-foreground">
+                      0.00%
+                    </div>
+                  )}
                 </td>
                 <td className="py-3 px-2 text-right">
                   <div className="font-medium text-foreground">
