@@ -64,7 +64,9 @@ async function processBalances(balances: any[], prices: any, changeMap: Map<stri
     .filter((balance: any) => {
       // Handle both spot and futures account structures
       const total = parseFloat(balance.free) + parseFloat(balance.locked) || parseFloat(balance.walletBalance) || 0;
-      return total > 0.00001;
+      const isValid = total > 0.000001; // Reduced threshold to include small crypto holdings
+      
+      return isValid;
     })
     .map((balance: any) => {
       const asset = balance.asset;
