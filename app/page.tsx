@@ -1,12 +1,11 @@
 'use client'
 
-import { Suspense, useState } from 'react'
+import { Suspense } from 'react'
 import useSWR from 'swr'
 import dynamic from 'next/dynamic'
 import { Loader2, RefreshCw, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AccountTabs } from '@/components/account-tabs'
 import type { PortfolioData } from '@/lib/types'
 import { exportToCSV } from '@/lib/utils'
 
@@ -25,18 +24,19 @@ const LastUpdated = dynamic(() => import('@/components/last-updated').then(mod =
   loading: () => <span className="text-sm text-muted-foreground">Loading...</span>
 })
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json())
+const fetcher = async (url: string): Promise<PortfolioData> => {
+  const res = await fetch(url)
+  const json = await res.json()
 
-interface ApiResponse {
-  success: boolean;
-  data: PortfolioData;
-  timestamp: string;
+  if (!res.ok) {
+    throw new Error(json?.error || 'Failed to load portfolio data')
+  }
+
+  return json as PortfolioData
 }
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'total' | 'spot' | 'margin' | 'futures'>('total')
-
-  const { data: response, error, isLoading, mutate } = useSWR<ApiResponse>(
+  const { data, error, isLoading, mutate } = useSWR<PortfolioData>(
     '/api/binance-balance',
     fetcher,
     {
@@ -47,17 +47,15 @@ export default function Dashboard() {
     }
   )
 
-  const data = response?.data
-  const totalBalance = data?.totalValue || 0
+  const totalBalance = Number(data?.totalPortfolioUSDT || 0)
 
   const handleRefresh = () => {
     mutate()
   }
 
   const handleExportCSV = () => {
-    if (data) {
-      const allBalances = Object.values(data.accounts).flatMap(account => account.balances)
-      exportToCSV(allBalances, 'binance-portfolio.csv')
+    if (data?.balances?.length) {
+      exportToCSV(data.balances, 'binance-portfolio.csv')
     }
   }
 
@@ -110,7 +108,7 @@ export default function Dashboard() {
 
           <Button
             onClick={handleExportCSV}
-            disabled={!data?.accounts?.spot?.balances || isLoading}
+            disabled={!data?.balances?.length || isLoading}
             variant="outline"
             size="sm"
             className="h-9"
@@ -130,54 +128,55 @@ export default function Dashboard() {
 
       {data && (
         <>
-          <AccountTabs
-            data={data}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-
-          <div className="grid gap-6">
-            <div className="h-80">
-              <AllocationChart
-                balances={data.accounts.spot?.balances || []}
-                className="h-full"
-              />
-            </div>
+          <div className="grid gap-6 md:grid-cols-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>Total Portfolio</CardTitle>
+                <CardDescription>Current value of all holdings</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </div>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Performance</CardTitle>
-                <CardDescription>24h change: {data.totalChange24h > 0 ? '+' : ''}{data.totalChange24h.toFixed(2)}%</CardDescription>
+                <CardTitle>Assets</CardTitle>
+                <CardDescription>Holdings with non-zero balance</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${totalBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="text-2xl font-bold">{data.balances.length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Status</CardTitle>
+                <CardDescription>Trading permission from Binance account</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${data.canTrade ? 'text-green-600' : 'text-red-600'}`}>
+                  {data.canTrade ? 'Active' : 'Restricted'}
+                </div>
               </CardContent>
             </Card>
           </div>
 
-          <div className="space-y-6">
-            {activeTab === 'total' ? (
-              Object.entries(data.accounts).map(([type, account]) => (
-                <div key={type} className="space-y-2">
-                  <h3 className="text-lg font-semibold">
-                    {type.charAt(0).toUpperCase() + type.slice(1)} Assets
-                  </h3>
-                  <Suspense fallback={<div className="animate-pulse bg-muted h-32 rounded-lg" />}>
-                    <AssetTable
-                      balances={account.balances}
-                      accountType={type as 'spot' | 'margin' | 'futures' | 'earn' | 'funding'}
-                    />
-                  </Suspense>
-                </div>
-              ))
-            ) : (
-              <Suspense fallback={<div className="animate-pulse bg-muted h-64 rounded-lg" />}>
-                <AssetTable
-                  balances={data.accounts[activeTab as 'spot' | 'margin' | 'futures']?.balances || []}
-                  accountType={activeTab as 'spot' | 'margin' | 'futures' | 'earn' | 'funding'}
-                />
-              </Suspense>
-            )}
+          <div className="grid gap-6">
+            <div className="h-80">
+              <AllocationChart
+                balances={data.balances}
+                className="h-full"
+              />
+            </div>
+
+            <Suspense fallback={<div className="animate-pulse bg-muted h-64 rounded-lg" />}>
+              <AssetTable
+                balances={data.balances}
+              />
+            </Suspense>
           </div>
         </>
       )}

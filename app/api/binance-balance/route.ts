@@ -57,7 +57,6 @@ export async function GET() {
     const client = Binance({
       apiKey: env.BINANCE_API_KEY,
       apiSecret: env.BINANCE_API_SECRET,
-      recvWindow: 60000,
     });
 
     const [accountInfo, dailyStats] = await Promise.all([
