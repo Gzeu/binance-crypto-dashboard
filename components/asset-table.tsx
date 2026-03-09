@@ -4,15 +4,15 @@ import { useState } from "react"
 import { ChevronUp, ChevronDown, Search } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import type { BalanceData } from "@/lib/types"
+import type { AssetBalance } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
 
 interface AssetTableProps {
-  balances: BalanceData[]
+  balances: AssetBalance[]
   accountType?: 'spot' | 'margin' | 'futures' | 'earn' | 'funding'
 }
 
-type SortKey = keyof Pick<BalanceData, 'asset' | 'total' | 'valueUSDT' | 'priceUSDT'>
+type SortKey = keyof Pick<AssetBalance, 'asset' | 'total' | 'valueUSDT' | 'priceUSDT'>
 type SortDirection = 'asc' | 'desc'
 
 export function AssetTable({ balances }: AssetTableProps) {
@@ -29,25 +29,32 @@ export function AssetTable({ balances }: AssetTableProps) {
     }
   }
 
+  const getComparableValue = (balance: AssetBalance, key: SortKey): number | string => {
+    if (key === 'asset') {
+      return balance.asset.toLowerCase()
+    }
+
+    return parseFloat(balance[key] || '0')
+  }
+
   const filteredAndSortedBalances = balances
-    .filter(balance => 
+    .filter(balance =>
       balance.asset.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      balance.valueUSDT > 0
+      parseFloat(balance.valueUSDT || '0') > 0
     )
     .sort((a, b) => {
-      let aValue: number | string = a[sortKey] as any
-      let bValue: number | string = b[sortKey] as any
-      
-      if (typeof aValue === 'string') {
-        aValue = aValue.toLowerCase()
-        bValue = (bValue as string).toLowerCase()
+      const aValue = getComparableValue(a, sortKey)
+      const bValue = getComparableValue(b, sortKey)
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortDirection === 'asc'
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue)
       }
-      
-      if (sortDirection === 'asc') {
-        return aValue > bValue ? 1 : -1
-      } else {
-        return aValue < bValue ? 1 : -1
-      }
+
+      return sortDirection === 'asc'
+        ? Number(aValue) - Number(bValue)
+        : Number(bValue) - Number(aValue)
     })
 
   const SortIcon = ({ column }: { column: SortKey }) => {
@@ -135,20 +142,20 @@ export function AssetTable({ balances }: AssetTableProps) {
                     </div>
                   </td>
                   <td className="p-4 text-right">
-                    {balance.total.toFixed(8)}
+                    {parseFloat(balance.total || '0').toFixed(8)}
                   </td>
                   <td className="p-4 text-right">
-                    {formatCurrency(balance.priceUSDT)}
+                    {formatCurrency(parseFloat(balance.priceUSDT || '0'))}
                   </td>
                   <td className="p-4 text-right font-medium">
-                    {formatCurrency(balance.valueUSDT)}
+                    {formatCurrency(parseFloat(balance.valueUSDT || '0'))}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        
+
         {filteredAndSortedBalances.length === 0 && (
           <div className="p-8 text-center text-muted-foreground">
             {searchTerm ? 'No assets found matching your search.' : 'No assets with balance > 0'}
