@@ -62,8 +62,12 @@ function makeSignedRequest(apiKey: string, apiSecret: string, endpoint: string):
 async function processBalances(balances: any[], prices: any, changeMap: Map<string, string>): Promise<AssetBalance[]> {
   return balances
     .filter((balance: any) => {
-      // Handle both spot and futures account structures
-      const total = parseFloat(balance.free) + parseFloat(balance.locked) || parseFloat(balance.walletBalance) || 0;
+      // Handle spot, futures, and margin account structures
+      const spotTotal = parseFloat(balance.free) + parseFloat(balance.locked);
+      const futuresTotal = parseFloat(balance.walletBalance) || 0;
+      const marginTotal = parseFloat(balance.netAsset) || 0;
+      
+      const total = spotTotal || futuresTotal || marginTotal;
       const isValid = total > 0.000001; // Reduced threshold to include small crypto holdings
       
       return isValid;
@@ -71,11 +75,15 @@ async function processBalances(balances: any[], prices: any, changeMap: Map<stri
     .map((balance: any) => {
       const asset = balance.asset;
       
-      // Handle both spot and futures structures
+      // Handle different account structures
       const free = parseFloat(balance.free) || 0;
       const locked = parseFloat(balance.locked) || 0;
       const walletBalance = parseFloat(balance.walletBalance) || 0;
-      const total = free + locked || walletBalance;
+      const netAsset = parseFloat(balance.netAsset) || 0;
+      
+      // Calculate total based on account type
+      const spotTotal = free + locked;
+      const total = spotTotal || walletBalance || netAsset;
 
       let priceUSDT = 0;
       let change24h = '0.00';
@@ -247,27 +255,30 @@ async function getOpenOrders(client: any, apiKey: string, apiSecret: string): Pr
   }
 }
 
-async function getMarginAccountData(client: any, prices: any, changeMap: Map<string, string>): Promise<AccountBalance | null> {
+async function getMarginAccountData(client: any, prices: any, changeMap: Map<string, string>, apiKey: string, apiSecret: string): Promise<AccountBalance | null> {
   try {
+    // Try cross margin account
     const marginAccountInfo = await retryApiCall(() => client.marginAccountInfo());
-    const balances = await processBalances(marginAccountInfo.userAssets, prices, changeMap);
     
-    const totalBalanceUSDT = balances.reduce(
-      (sum: number, balance: AssetBalance) => sum + parseFloat(balance.valueUSDT),
-      0
-    );
-
-    return {
-      accountType: 'margin',
-      totalBalanceUSDT: totalBalanceUSDT.toFixed(2),
-      availableBalanceUSDT: parseFloat(marginAccountInfo.assetOfUSDT?.free || 0).toFixed(2),
-      balances,
-      marginLevel: marginAccountInfo.marginLevel || '0',
-      marginFree: parseFloat(marginAccountInfo.marginFree || 0).toFixed(2),
-      marginUsed: parseFloat(marginAccountInfo.marginUsed || 0).toFixed(2),
-    };
+    if (marginAccountInfo?.totalAssetOfUSDT && parseFloat(marginAccountInfo.totalAssetOfUSDT) > 0) {
+      const balances = await processBalances(marginAccountInfo.userAssets, prices, changeMap);
+      
+      return {
+        accountType: 'margin',
+        totalBalanceUSDT: parseFloat(marginAccountInfo.totalAssetOfUSDT).toFixed(2),
+        availableBalanceUSDT: parseFloat(marginAccountInfo.totalAssetOfUSDT || '0').toFixed(2),
+        balances,
+        marginLevel: marginAccountInfo.marginLevel || '0',
+        marginFree: parseFloat(marginAccountInfo.marginFree || '0').toFixed(2),
+        marginUsed: parseFloat(marginAccountInfo.marginUsed || '0').toFixed(2),
+      };
+    }
+    
+    // If no margin data, return null (likely due to API permissions)
+    return null;
+    
   } catch (error: any) {
-    console.warn('Margin account not available:', error.message);
+    // Margin account not available - likely due to API key permissions
     return null;
   }
 }
@@ -308,7 +319,7 @@ export async function GET() {
     const [spotAccount, futuresAccount, marginAccount, openPositions, openOrders] = await Promise.allSettled([
       getSpotAccountData(client, prices, changeMap),
       getFuturesAccountData(client, prices, changeMap, env.BINANCE_API_KEY, env.BINANCE_API_SECRET),
-      getMarginAccountData(client, prices, changeMap),
+      getMarginAccountData(client, prices, changeMap, env.BINANCE_API_KEY, env.BINANCE_API_SECRET),
       getOpenPositions(env.BINANCE_API_KEY, env.BINANCE_API_SECRET),
       getOpenOrders(client, env.BINANCE_API_KEY, env.BINANCE_API_SECRET)
     ]);
