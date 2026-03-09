@@ -5,6 +5,7 @@ export interface AssetBalance {
   total: string;
   priceUSDT: string;
   valueUSDT: string;
+  change24h: string;
 }
 
 export interface PortfolioData {
