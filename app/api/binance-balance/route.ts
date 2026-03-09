@@ -2,60 +2,51 @@ import { NextResponse } from 'next/server';
 import Binance from 'binance-api-node';
 import { z } from 'zod';
 
-// Validation schema for environment variables
 const envSchema = z.object({
   BINANCE_API_KEY: z.string().min(1, 'BINANCE_API_KEY is required'),
   BINANCE_API_SECRET: z.string().min(1, 'BINANCE_API_SECRET is required'),
 });
 
-// Cache pentru rate limiting
 let lastFetchTime = 0;
 let cachedData: any = null;
-const CACHE_DURATION = 15000; // 15 seconds cache
+const CACHE_DURATION = 15000;
 
-// Retry configuration
 const RETRY_ATTEMPTS = 3;
-const RETRY_DELAY = 1000; // 1 second base delay
+const RETRY_DELAY = 1000;
 
-// Helper function for exponential backoff
 function delay(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Helper function to retry API calls
-async function retryApiCall<T>(fn: () => Promise<T>, attempts: number = RETRY_ATTEMPTS): Promise<T> {
+async function retryApiCall(fn: () => Promise<any>, attempts: number = RETRY_ATTEMPTS): Promise<any> {
   for (let i = 0; i < attempts; i++) {
     try {
       return await fn();
     } catch (error: any) {
       const isLastAttempt = i === attempts - 1;
       const shouldRetry = error?.code === -1003 || error?.code === 429 || error?.code >= 500;
-      
+
       if (isLastAttempt || !shouldRetry) {
         throw error;
       }
-      
-      // Exponential backoff with jitter
+
       const delayMs = RETRY_DELAY * Math.pow(2, i) + Math.random() * 1000;
       await delay(delayMs);
     }
   }
-  
+
   throw new Error('Max retry attempts reached');
 }
 
-// GET handler for portfolio balance
 export async function GET() {
   try {
-    // Validate environment variables
     const env = envSchema.parse({
       BINANCE_API_KEY: process.env.BINANCE_API_KEY,
       BINANCE_API_SECRET: process.env.BINANCE_API_SECRET,
     });
 
-    // Check cache first to respect rate limits
     const now = Date.now();
-    if (cachedData && (now - lastFetchTime) < CACHE_DURATION) {
+    if (cachedData && now - lastFetchTime < CACHE_DURATION) {
       return NextResponse.json({
         ...cachedData,
         cached: true,
@@ -63,22 +54,17 @@ export async function GET() {
       });
     }
 
-    // Initialize Binance client with server time synchronization
     const client = Binance({
       apiKey: env.BINANCE_API_KEY,
       apiSecret: env.BINANCE_API_SECRET,
-      useServerTime: true,
-      recvWindow: 60000, // 60 seconds receive window
+      recvWindow: 60000,
     });
 
-    // Fetch account information and daily stats with retry logic
-    const [accountInfo, exchangeInfo, dailyStats] = await Promise.all([
+    const [accountInfo, dailyStats] = await Promise.all([
       retryApiCall(() => client.accountInfo()),
-      retryApiCall(() => client.exchangeInfo()),
       retryApiCall(() => client.dailyStats()),
     ]);
 
-    // Get current prices for USDT conversion
     const prices = await retryApiCall(() => client.prices());
 
     const changeMap = new Map<string, string>();
@@ -88,44 +74,39 @@ export async function GET() {
       });
     }
 
-    // Process balances - filter out zero balances and format
     const balances = accountInfo.balances
       .filter((balance: any) => {
         const total = parseFloat(balance.free) + parseFloat(balance.locked);
-        return total > 0.00001; // Filter out dust amounts
+        return total > 0.00001;
       })
       .map((balance: any) => {
         const asset = balance.asset;
         const free = parseFloat(balance.free);
         const locked = parseFloat(balance.locked);
         const total = free + locked;
-        
-        // Get USDT price and 24h change
-        let priceUSDT = 0;
-        let change24h = "0.00";
 
-        if (asset === 'USDT') {
+        let priceUSDT = 0;
+        let change24h = '0.00';
+
+        if (asset === 'USDT' || asset === 'BUSD' || asset === 'USDC' || asset === 'FDUSD') {
           priceUSDT = 1;
-        } else if (asset === 'BUSD' || asset === 'USDC' || asset === 'FDUSD') {
-          priceUSDT = 1; 
         } else {
-          // Try different price pairs
           const priceKey = `${asset}USDT`;
           const btcPriceKey = `${asset}BTC`;
-          
+
           if (prices[priceKey]) {
             priceUSDT = parseFloat(prices[priceKey]);
-            change24h = changeMap.get(priceKey) || "0.00";
-          } else if (prices[btcPriceKey] && prices['BTCUSDT']) {
-            const btcPrice = parseFloat(prices['BTCUSDT']);
+            change24h = changeMap.get(priceKey) || '0.00';
+          } else if (prices[btcPriceKey] && prices.BTCUSDT) {
+            const btcPrice = parseFloat(prices.BTCUSDT);
             const assetBtcPrice = parseFloat(prices[btcPriceKey]);
             priceUSDT = assetBtcPrice * btcPrice;
-            change24h = changeMap.get(btcPriceKey) || "0.00";
+            change24h = changeMap.get(btcPriceKey) || '0.00';
           }
         }
-        
+
         const valueUSDT = total * priceUSDT;
-        
+
         return {
           asset,
           free: free.toFixed(8),
@@ -138,13 +119,11 @@ export async function GET() {
       })
       .sort((a: any, b: any) => parseFloat(b.valueUSDT) - parseFloat(a.valueUSDT));
 
-    // Calculate total portfolio value
     const totalPortfolioUSDT = balances.reduce(
       (sum: number, balance: any) => sum + parseFloat(balance.valueUSDT),
       0
     );
 
-    // Prepare response data
     const responseData = {
       balances,
       totalPortfolioUSDT: totalPortfolioUSDT.toFixed(2),
@@ -157,12 +136,10 @@ export async function GET() {
       cached: false,
     };
 
-    // Update cache
     cachedData = responseData;
     lastFetchTime = now;
 
     return NextResponse.json(responseData);
-  
   } catch (error: any) {
     console.error('Binance API Error:', {
       message: error.message,
@@ -170,7 +147,6 @@ export async function GET() {
       timestamp: new Date().toISOString(),
     });
 
-    // Return sanitized error response
     const errorMessage = error.code === -2014
       ? 'Invalid API key format'
       : error.code === -1022
@@ -192,7 +168,6 @@ export async function GET() {
   }
 }
 
-// Health check endpoint
 export async function HEAD() {
   return new NextResponse(null, { status: 200 });
 }
