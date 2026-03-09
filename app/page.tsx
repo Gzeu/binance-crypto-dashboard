@@ -7,23 +7,20 @@ import { Loader2, RefreshCw, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AccountTabs } from '@/components/account-tabs'
-// PerformanceMetrics component is not available, will be implemented later
 import type { PortfolioData } from '@/lib/types'
 import { exportToCSV } from '@/lib/utils'
 
-// Dynamic imports for components that cause hydration issues
-// Fix: Use proper import syntax for named exports
-const AssetTable = dynamic(() => import('@/components/asset-table').then(mod => ({ default: mod.AssetTable })), { 
+const AssetTable = dynamic(() => import('@/components/asset-table').then(mod => ({ default: mod.AssetTable })), {
   ssr: false,
   loading: () => <div className="animate-pulse bg-muted h-32 rounded-lg" />
 })
 
-const AllocationChart = dynamic(() => import('@/components/allocation-chart').then(mod => ({ default: mod.AllocationChart })), { 
+const AllocationChart = dynamic(() => import('@/components/allocation-chart').then(mod => ({ default: mod.AllocationChart })), {
   ssr: false,
   loading: () => <div className="animate-pulse bg-muted h-64 rounded-lg" />
 })
 
-const LastUpdated = dynamic(() => import('@/components/last-updated').then(mod => ({ default: mod.LastUpdated })), { 
+const LastUpdated = dynamic(() => import('@/components/last-updated').then(mod => ({ default: mod.LastUpdated })), {
   ssr: false,
   loading: () => <span className="text-sm text-muted-foreground">Loading...</span>
 })
@@ -37,6 +34,8 @@ interface ApiResponse {
 }
 
 export default function Dashboard() {
+  const [activeTab, setActiveTab] = useState<'total' | 'spot' | 'margin' | 'futures'>('total')
+
   const { data: response, error, isLoading, mutate } = useSWR<ApiResponse>(
     '/api/binance-balance',
     fetcher,
@@ -47,11 +46,9 @@ export default function Dashboard() {
       errorRetryInterval: 5000,
     }
   )
-  
-  // Extract the portfolio data from the API response
+
   const data = response?.data
   const totalBalance = data?.totalValue || 0
-  const spotBalance = data?.accounts.spot?.totalValue || 0
 
   const handleRefresh = () => {
     mutate()
@@ -59,15 +56,10 @@ export default function Dashboard() {
 
   const handleExportCSV = () => {
     if (data) {
-      // Flatten all account balances into a single array
       const allBalances = Object.values(data.accounts).flatMap(account => account.balances)
       exportToCSV(allBalances, 'binance-portfolio.csv')
     }
   }
-  
-  // Log the data for debugging
-  console.log('API Response:', response)
-  console.log('Portfolio Data:', data)
 
   if (error) {
     return (
@@ -90,11 +82,8 @@ export default function Dashboard() {
     )
   }
 
-  const [activeTab, setActiveTab] = useState<'total' | 'spot' | 'margin' | 'futures'>('total')
-
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Binance Portfolio</h1>
@@ -102,7 +91,7 @@ export default function Dashboard() {
             <LastUpdated data={data} />
           </Suspense>
         </div>
-        
+
         <div className="flex gap-2">
           <Button
             onClick={handleRefresh}
@@ -118,7 +107,7 @@ export default function Dashboard() {
             )}
             <span className="hidden sm:inline">{isLoading ? 'Refreshing...' : 'Refresh'}</span>
           </Button>
-          
+
           <Button
             onClick={handleExportCSV}
             disabled={!data?.accounts?.spot?.balances || isLoading}
@@ -132,7 +121,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Loading State */}
       {isLoading && !data && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="animate-pulse bg-muted h-64 rounded-lg" />
@@ -140,26 +128,22 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Content */}
       {data && (
         <>
-          {/* Account Tabs */}
-          <AccountTabs 
-            data={data} 
+          <AccountTabs
+            data={data}
             activeTab={activeTab}
             onTabChange={setActiveTab}
           />
 
-          {/* Allocation Chart */}
           <div className="grid gap-6">
             <div className="h-80">
-              <AllocationChart 
+              <AllocationChart
                 balances={data.accounts.spot?.balances || []}
                 className="h-full"
               />
             </div>
-            
-            {/* Performance Metrics */}
+
             <Card>
               <CardHeader>
                 <CardTitle>Performance</CardTitle>
@@ -171,27 +155,24 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Asset Tables */}
           <div className="space-y-6">
             {activeTab === 'total' ? (
-              // Show all account types in separate tables
               Object.entries(data.accounts).map(([type, account]) => (
                 <div key={type} className="space-y-2">
                   <h3 className="text-lg font-semibold">
                     {type.charAt(0).toUpperCase() + type.slice(1)} Assets
                   </h3>
                   <Suspense fallback={<div className="animate-pulse bg-muted h-32 rounded-lg" />}>
-                    <AssetTable 
-                      balances={account.balances} 
+                    <AssetTable
+                      balances={account.balances}
                       accountType={type as 'spot' | 'margin' | 'futures' | 'earn' | 'funding'}
                     />
                   </Suspense>
                 </div>
               ))
             ) : (
-              // Show only the selected account type
               <Suspense fallback={<div className="animate-pulse bg-muted h-64 rounded-lg" />}>
-                <AssetTable 
+                <AssetTable
                   balances={data.accounts[activeTab as 'spot' | 'margin' | 'futures']?.balances || []}
                   accountType={activeTab as 'spot' | 'margin' | 'futures' | 'earn' | 'funding'}
                 />
