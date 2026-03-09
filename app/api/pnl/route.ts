@@ -53,9 +53,7 @@ async function getSpotPricesUSD(client: ReturnType<typeof Binance>) {
   }
 }
 
-// Average Cost method for realized PnL (spot)
 function computeRealizedPnlAverageCost(trades: Trade[], getPriceUSD: (asset: string) => number) {
-  // Group by symbol
   const bySymbol = new Map<string, Trade[]>()
   for (const t of trades) {
     const arr = bySymbol.get(t.symbol) || []
@@ -68,12 +66,7 @@ function computeRealizedPnlAverageCost(trades: Trade[], getPriceUSD: (asset: str
   const breakdown: PnlBreakdown[] = []
 
   for (const [symbol, list] of bySymbol.entries()) {
-    // Sort by time asc
     list.sort((a, b) => a.time - b.time)
-
-    // Track position using average cost in base asset
-    // For symbol like BTCUSDT: base=BTC, quote=USDT
-    const base = symbol.replace(/USDT|BUSD|USDC|USD$/, '')
 
     let positionQty = 0
     let avgCostUSDPerBase = 0
@@ -85,20 +78,17 @@ function computeRealizedPnlAverageCost(trades: Trade[], getPriceUSD: (asset: str
       const price = parseFloat(tr.price)
       const quote = parseFloat(tr.quoteQty)
 
-      // Fee conversion to USD
       const feeAsset = tr.commissionAsset
       const feeAmt = parseFloat(tr.commission)
       const feeUsd = getPriceUSD(feeAsset) * feeAmt
       fees += feeUsd
 
       if (tr.isBuyer) {
-        // Buy increases position; update average cost
-        const costUSD = quote // spent in quote (approx USD stable)
+        const costUSD = quote
         const newQty = positionQty + qty
         avgCostUSDPerBase = newQty > 0 ? (avgCostUSDPerBase * positionQty + costUSD) / newQty : 0
         positionQty = newQty
       } else {
-        // Sell decreases position; realize PnL on sold qty
         const qtySold = Math.min(qty, positionQty)
         const proceedsUSD = price * qtySold
         const costUSD = avgCostUSDPerBase * qtySold
@@ -127,7 +117,6 @@ export async function GET(req: NextRequest) {
     const from = parseDateParam(searchParams.get('from'))
     const to = parseDateParam(searchParams.get('to'), 0)
 
-    // Fetch recent trades for all symbols in portfolio scope
     const account = await client.accountInfo()
     const symbols = account.balances
       .map(b => b.asset)
@@ -139,22 +128,16 @@ export async function GET(req: NextRequest) {
     const trades: Trade[] = []
     for (const symbol of symbols) {
       try {
-        // Limit window to avoid rate limits; Binance returns latest trades
         const symbolTrades = await client.myTrades({ symbol })
         for (const t of symbolTrades) {
           if (t.time >= from.getTime() && t.time <= to.getTime()) trades.push(t as unknown as Trade)
         }
       } catch (_) {
-        // ignore symbols without trade permission/history
       }
     }
 
     const { totalRealized, totalFees, breakdown } = computeRealizedPnlAverageCost(trades, getUSD)
-
-    // Unrealized PnL approximation: need avg cost of current open position; here return 0 as placeholder
     const unrealized = 0
-
-    // ROI estimation: realized PnL / (sum buys in window) — simplified; precise ROI requires full cashflow
     const notionalBuysUSD = trades.filter(t => t.isBuyer).reduce((s, t) => s + parseFloat(t.quoteQty), 0)
     const roi = notionalBuysUSD > 0 ? (totalRealized / notionalBuysUSD) * 100 : 0
 
