@@ -20,11 +20,9 @@ export function PortfolioSummary({ data }: PortfolioSummaryProps) {
 
   const totalAssets = data.balances.length;
   const tradingEnabled = data.canTrade;
-  const lastUpdated = new Date(data.updateTime).toLocaleString();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      {/* Total Portfolio Value */}
       <div className="bg-card p-6 rounded-lg border hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -51,7 +49,6 @@ export function PortfolioSummary({ data }: PortfolioSummaryProps) {
         </div>
       </div>
 
-      {/* Assets Count */}
       <div className="bg-card p-6 rounded-lg border hover:shadow-md transition-shadow">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="h-5 w-5 text-primary" />
@@ -67,7 +64,6 @@ export function PortfolioSummary({ data }: PortfolioSummaryProps) {
         </div>
       </div>
 
-      {/* Account Status */}
       <div className="bg-card p-6 rounded-lg border hover:shadow-md transition-shadow">
         <div className="flex items-center gap-2 mb-4">
           <Shield className="h-5 w-5 text-primary" />

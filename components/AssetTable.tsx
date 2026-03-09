@@ -12,9 +12,8 @@ export function AssetTable({ balances }: AssetTableProps) {
   const [sortField, setSortField] = useState<SortField>('valueUSDT');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  // Filter and sort balances
   const filteredAndSortedBalances = useMemo(() => {
-    let filtered = balances.filter((balance) =>
+    const filtered = balances.filter((balance) =>
       balance.asset.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -75,8 +74,8 @@ export function AssetTable({ balances }: AssetTableProps) {
     if (sortField !== field) {
       return <ArrowUpDown className="h-4 w-4" />;
     }
-    return sortDirection === 'asc' ? 
-      <ArrowUp className="h-4 w-4" /> : 
+    return sortDirection === 'asc' ?
+      <ArrowUp className="h-4 w-4" /> :
       <ArrowDown className="h-4 w-4" />;
   };
 
@@ -84,8 +83,7 @@ export function AssetTable({ balances }: AssetTableProps) {
     <div className="bg-card p-6 rounded-lg border">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl font-semibold text-card-foreground">Asset Holdings</h2>
-        
-        {/* Search */}
+
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
@@ -98,7 +96,6 @@ export function AssetTable({ balances }: AssetTableProps) {
         </div>
       </div>
 
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
