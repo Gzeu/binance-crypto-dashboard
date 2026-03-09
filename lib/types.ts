@@ -8,10 +8,71 @@ export interface AssetBalance {
   change24h: string;
 }
 
-export interface PortfolioData {
+export interface OpenPosition {
+  symbol: string;
+  positionAmt: string;
+  entryPrice: string;
+  markPrice: string;
+  unRealizedProfit: string;
+  liquidationPrice: string;
+  leverage: string;
+  maxNotionalValue: string;
+  marginType: string;
+  isolatedMargin: string;
+  isAutoAddMargin: string;
+  positionSide: string;
+  notional: string;
+  isolatedWallet: string;
+  updateTime: number;
+}
+
+export interface OpenOrder {
+  symbol: string;
+  orderId: number;
+  orderListId: number;
+  clientOrderId: string;
+  price: string;
+  origQty: string;
+  executedQty: string;
+  cumQuote: string;
+  status: string;
+  timeInForce: string;
+  type: string;
+  side: string;
+  stopPrice: string;
+  icebergQty: string;
+  time: number;
+  updateTime: number;
+  isWorking: boolean;
+  origQuoteOrderQty: string;
+}
+
+export interface RealTimeData {
+  prices: Record<string, string>;
+  timestamp: number;
+}
+
+export interface AccountBalance {
+  accountType: 'spot' | 'futures' | 'margin';
+  totalBalanceUSDT: string;
+  availableBalanceUSDT: string;
   balances: AssetBalance[];
+  marginLevel?: string;
+  marginFree?: string;
+  marginUsed?: string;
+  maintenanceMargin?: string;
+}
+
+export interface PortfolioData {
+  accounts: AccountBalance[];
   totalPortfolioUSDT: string;
-  accountType: string;
+  totalSpotUSDT: string;
+  totalFuturesUSDT: string;
+  totalMarginUSDT: string;
+  openPositions: OpenPosition[];
+  openOrders: OpenOrder[];
+  realTimePrices: Record<string, string>;
+  totalUnrealizedPnL: string;
   canTrade: boolean;
   canWithdraw: boolean;
   canDeposit: boolean;
